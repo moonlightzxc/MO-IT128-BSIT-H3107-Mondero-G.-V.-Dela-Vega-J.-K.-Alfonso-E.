@@ -10,6 +10,14 @@ df = pd.read_csv("/Users/gillianmondero/Downloads/Transaction_Data.csv")
 print(df.head())
 print(df.info())
 
+# Check for missing values right after loading the dataset
+print("Missing values after loading the dataset:\n", df.isnull().sum())
+
+# Identify duplicate rows
+duplicates = df[df.duplicated()]
+duplicate_count = duplicates.shape[0]
+print(f"Number of duplicate rows: {duplicate_count}")
+
 # Remove duplicates
 df_before = df.shape
 df = df.drop_duplicates()
