@@ -1,0 +1,107 @@
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.cluster import KMeans
+import numpy as np
+
+# Load the dataset
+df = pd.read_csv("/Users/gillianmondero/Downloads/Transaction_Data.csv")
+
+# Display the first few rows and basic information about the dataset
+print(df.head())
+print(df.info())
+
+# Remove duplicates
+df_before = df.shape
+df = df.drop_duplicates()
+df_after = df.shape
+print(f"Shape before removing duplicates: {df_before}")
+print(f"Shape after removing duplicates: {df_after}")
+
+# Identify and handle missing values
+missing_values = df.isnull().sum()
+print("Missing values in each column:\n", missing_values)
+
+# Fill missing values in numerical columns with rounded mean
+for column in df.select_dtypes(include=['float64', 'int64']).columns:
+    if column == 'Transaction_Amount':  
+        mean_value = round(df[column].mean(), 2)  # Round to 2 decimal places for imputation
+        df[column] = df[column].fillna(mean_value)
+    else:
+        df[column] = df[column].fillna(df[column].mean())
+
+# Confirm that there are no missing values
+missing_values_after = df.isnull().sum()
+print("Missing values in each column after imputation:\n", missing_values_after)
+
+# Normalize the Transaction_Amount column without rounding
+scaler = MinMaxScaler()
+df['Normalized_Transaction_Amount'] = scaler.fit_transform(df[['Transaction_Amount']])
+
+# Apply one-hot encoding to Transaction_Type
+df = pd.get_dummies(df, columns=['Transaction_Type'], prefix='Type')
+
+# Convert Transaction_Date to datetime format
+df['Transaction_Date'] = pd.to_datetime(df['Transaction_Date'])
+
+# Remove Transaction_ID
+df = df.drop(columns=['Transaction_ID'])
+
+# Sort by Customer_ID in ascending order
+df_sorted = df.sort_values(by='Customer_ID', ascending=True)
+
+# Reset index
+df_sorted.reset_index(drop=True, inplace=True)
+
+# Correlation analysis
+correlation_matrix = df.corr()
+print("Correlation Matrix:\n", correlation_matrix)
+
+# Identify and handle outliers in Transaction_Amount using IQR
+Q1 = df['Transaction_Amount'].quantile(0.25)
+Q3 = df['Transaction_Amount'].quantile(0.75)
+IQR = Q3 - Q1
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+outliers = df[(df['Transaction_Amount'] < lower_bound) | (df['Transaction_Amount'] > upper_bound)]
+
+# Log outliers
+outlier_count = outliers.shape[0]
+outlier_percentage = (outlier_count / df.shape[0]) * 100
+print(f"Outlier count: {outlier_count}, Outlier percentage: {outlier_percentage:.2f}%")
+
+# Cap outliers to IQR bounds
+df['Transaction_Amount'] = df['Transaction_Amount'].clip(lower=lower_bound, upper=upper_bound)
+
+# Confirm that no outliers remain
+remaining_outliers = df[(df['Transaction_Amount'] < lower_bound) | (df['Transaction_Amount'] > upper_bound)].shape[0]
+print(f"Remaining outliers: {remaining_outliers}")
+
+# Calculate features per customer including Transaction_Type
+customer_features = df.groupby('Customer_ID').agg(
+    Transactions_Per_Customer=('Customer_ID', 'size'),
+    Average_Transaction_Amount=('Transaction_Amount', 'mean'),
+    Total_Transaction_Amount=('Transaction_Amount', 'sum'),
+    Recency=('Transaction_Date', lambda x: (df['Transaction_Date'].max() - x.max()).days),
+    **{f'Count_{col}': (col, 'sum') for col in df.columns if col.startswith('Type_')}
+).reset_index()
+
+# Round calculated amounts to 2 decimal places
+customer_features['Average_Transaction_Amount'] = customer_features['Average_Transaction_Amount'].round(2)
+customer_features['Total_Transaction_Amount'] = customer_features['Total_Transaction_Amount'].round(2)
+
+# Normalize the features for clustering
+scaler = StandardScaler()
+normalized_features = scaler.fit_transform(customer_features[['Transactions_Per_Customer', 
+                                                             'Average_Transaction_Amount', 
+                                                             'Total_Transaction_Amount', 
+                                                             'Recency'] + [f'Count_{col}' for col in df.columns if col.startswith('Type_')]])
+
+# Apply K-Means clustering
+kmeans = KMeans(n_clusters=3, random_state=42)  # Choose the number of clusters
+customer_features['Cluster'] = kmeans.fit_predict(normalized_features)
+
+# Print the customer features with clusters
+print(customer_features)
+
+# Save to a CSV file
+customer_features.to_csv("customer_transactions.csv", index=False)
