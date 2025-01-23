@@ -92,9 +92,9 @@ scaled_features = scaler.fit_transform(customer_features[['Transactions_Per_Cust
                                                           'Total_Transaction_Amount', 
                                                           'Recency'] + [f'Count_{col}' for col in df.columns if col.startswith('Type_')]])
 
-# Print cleaned customer features
-print("Cleaned Customer Features:\n", customer_features)
+# Print cleaned customer transactions
+print("Cleaned Customer Transactions:\n", customer_features)  
 
 # Ensure Customer_ID is sorted 
-customer_features = customer_features.sort_values(by='Customer_ID')
-customer_features.to_csv("customer_features.csv", index=False)
+customer_features = customer_features.sort_values(by='Customer_ID')  
+customer_features.to_csv("customer_transactions.csv", index=False)  
