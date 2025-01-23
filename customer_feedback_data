@@ -5,7 +5,8 @@ import numpy as np
 # Load the dataset
 df = pd.read_csv("/Users/gillianmondero/Downloads/Customer_Feedback_Data.csv")
 
-# Check initial info
+# Check the dataset structure
+print(df.head())
 print(df.info())
 
 # Remove duplicates
