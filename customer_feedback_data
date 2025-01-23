@@ -1,0 +1,51 @@
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
+
+# Load the dataset
+df = pd.read_csv("/Users/gillianmondero/Downloads/Customer_Feedback_Data.csv")
+
+# Check initial info
+print(df.info())
+
+# Remove duplicates
+df = df.drop_duplicates()
+
+# Handle missing data
+df['Satisfaction_Score'] = df['Satisfaction_Score'].fillna(df['Satisfaction_Score'].median())
+
+# Convert categorical features to numerical
+df['Feedback_Comments'] = df['Feedback_Comments'].astype('category')
+df['Feedback_Comments_Encoded'] = df['Feedback_Comments'].cat.codes
+
+# Identify and handle outliers using Z-score
+mean = df['Satisfaction_Score'].mean()
+std_dev = df['Satisfaction_Score'].std()
+df['Z_score'] = (df['Satisfaction_Score'] - mean) / std_dev
+
+# Replace outliers with the median (Z-score > 3 or < -3)
+median_value = df['Satisfaction_Score'].median()
+df.loc[(df['Z_score'] > 3) | (df['Z_score'] < -3), 'Satisfaction_Score'] = median_value
+
+# Normalize numerical columns
+numeric_columns = ['Satisfaction_Score', 'Likelihood_to_Recommend']
+scaler = MinMaxScaler()
+df[numeric_columns] = scaler.fit_transform(df[numeric_columns])
+
+# Feature engineering
+df['Recommendation_Index'] = (
+    df['Satisfaction_Score'] * 0.7 + df['Likelihood_to_Recommend'] * 0.3
+)
+df['Recommendation_Index'] = scaler.fit_transform(df[['Recommendation_Index']])
+
+# Summary statistics for EDA
+print(df.describe())
+
+# Drop unnecessary columns for clarity in EDA
+df = df.drop(['Z_score', 'Feedback_Comments_Encoded'], axis=1)
+
+# Save or print final preprocessed data
+print(df.head())
+
+# Save file
+df.to_csv("Cleaned_Customer_Feedback_Data.csv", index=False)
