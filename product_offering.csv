@@ -1,0 +1,11 @@
+Product_ID,Product_Name,Target_Age_Group,Product_Type_Investment,Product_Type_Loan,Product_Type_Savings Account,Risk_Level_Low,Risk_Level_Medium,Target_Income_Group_Low,Target_Income_Group_Medium,Product_Category,Risk_Score
+1,Platinum Credit Card,42.46,False,False,False,False,True,False,True,Investment,2
+2,Gold Savings Account,27.49,False,False,True,True,False,True,False,Savings,1
+3,High-Yield Investment Account,53.46,True,False,False,False,False,False,False,Investment,0
+4,Mortgage Loan,33.23,False,True,False,False,True,False,False,Loan,2
+5,Auto Loan,33.87,False,True,False,False,True,False,True,Loan,2
+6,Personal Loan,46.59,False,True,False,False,True,True,False,Loan,2
+7,Youth Savings Account,23.84,False,False,True,True,False,True,False,Savings,1
+8,Retirement Investment Fund,62.68,True,False,False,False,False,False,False,Investment,0
+9,Business Loan,46.25,False,True,False,False,True,False,True,Loan,2
+10,Travel Credit Card,49.43,False,False,False,False,True,False,True,Investment,2
