@@ -9,8 +9,20 @@ df = pd.read_csv("/Users/gillianmondero/Downloads/Customer_Feedback_Data.csv")
 print(df.head())
 print(df.info())
 
-# Remove duplicates
+# Find and remove duplicate rows
+duplicates = df[df.duplicated()]
+print(f"Number of duplicate rows: {duplicates.shape[0]}")
+
+df_before = df.shape
 df = df.drop_duplicates()
+df_after = df.shape
+
+print(f"Shape before removing duplicates: {df_before}")
+print(f"Shape after removing duplicates: {df_after}")
+
+# Handle missing values
+missing_values = df.isnull().sum()
+print("Missing values in each column:\n", missing_values)
 
 # Handle missing data
 df['Satisfaction_Score'] = df['Satisfaction_Score'].fillna(df['Satisfaction_Score'].median())
