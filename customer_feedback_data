@@ -4,61 +4,78 @@ import numpy as np
 
 # Load the dataset
 df = pd.read_csv("/Users/gillianmondero/Downloads/Customer_Feedback_Data.csv")
+print("Initial Dataset Structure:\n", df.head())
+print("\nDataset Info:")
+df.info()
 
-# Check the dataset structure
-print(df.head())
-print(df.info())
-
-# Find and remove duplicate rows
+# Remove duplicates
 duplicates = df[df.duplicated()]
-print(f"Number of duplicate rows: {duplicates.shape[0]}")
-
-df_before = df.shape
+print(f"\nNumber of duplicate rows: {duplicates.shape[0]}")
 df = df.drop_duplicates()
-df_after = df.shape
-
-print(f"Shape before removing duplicates: {df_before}")
-print(f"Shape after removing duplicates: {df_after}")
+print(f"Shape after removing duplicates: {df.shape}")
 
 # Handle missing values
 missing_values = df.isnull().sum()
 print("Missing values in each column:\n", missing_values)
-
-# Handle missing data
 df['Satisfaction_Score'] = df['Satisfaction_Score'].fillna(df['Satisfaction_Score'].median())
+print("Missing values in Satisfaction_Score column after imputation:", df['Satisfaction_Score'].isnull().sum())
 
 # Convert categorical features to numerical
 df['Feedback_Comments'] = df['Feedback_Comments'].astype('category')
 df['Feedback_Comments_Encoded'] = df['Feedback_Comments'].cat.codes
+print("Original and Encoded Feedback_Comments:\n", df[['Feedback_Comments', 'Feedback_Comments_Encoded']].head())
 
-# Identify and handle outliers using Z-score
-mean = df['Satisfaction_Score'].mean()
-std_dev = df['Satisfaction_Score'].std()
-df['Z_score'] = (df['Satisfaction_Score'] - mean) / std_dev
+# Define a function to detect outliers using the IQR method
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
 
-# Replace outliers with the median (Z-score > 3 or < -3)
-median_value = df['Satisfaction_Score'].median()
-df.loc[(df['Z_score'] > 3) | (df['Z_score'] < -3), 'Satisfaction_Score'] = median_value
+# Detect outliers in Satisfaction_Score and Likelihood_to_Recommend
+satisfaction_outliers = detect_outliers_iqr(df, 'Satisfaction_Score')
+recommendation_outliers = detect_outliers_iqr(df, 'Likelihood_to_Recommend')
+print("Number of Satisfaction_Score outliers:", satisfaction_outliers.shape[0])
+print("Number of Likelihood_to_Recommend outliers:", recommendation_outliers.shape[0])
 
-# Normalize numerical columns
-numeric_columns = ['Satisfaction_Score', 'Likelihood_to_Recommend']
+# Handle outliers by mean imputation
+mean_satisfaction = df['Satisfaction_Score'].mean()
+df.loc[satisfaction_outliers.index, 'Satisfaction_Score'] = mean_satisfaction
+
+mean_recommend = df['Likelihood_to_Recommend'].mean()
+df.loc[recommendation_outliers.index, 'Likelihood_to_Recommend'] = mean_recommend
+
+# Normalize numerical columns using MinMaxScaler
 scaler = MinMaxScaler()
-df[numeric_columns] = scaler.fit_transform(df[numeric_columns])
+numerical_columns = ['Satisfaction_Score', 'Likelihood_to_Recommend']
+df[numerical_columns] = scaler.fit_transform(df[numerical_columns])
+print("Normalized Numerical Columns:\n", df[numerical_columns].head())
 
-# Feature engineering
-df['Recommendation_Index'] = (
-    df['Satisfaction_Score'] * 0.7 + df['Likelihood_to_Recommend'] * 0.3
+# Categorize Likelihood_to_Recommend
+df['Recommendation_Category'] = pd.cut(
+    df['Likelihood_to_Recommend'], 
+    bins=[0, 4, 7, 10], 
+    labels=['Low', 'Medium', 'High'], 
+    right=True
 )
-df['Recommendation_Index'] = scaler.fit_transform(df[['Recommendation_Index']])
 
-# Summary statistics for EDA
-print(df.describe())
+# Categorize Satisfaction_Score
+df['Satisfaction_Category'] = pd.cut(
+    df['Satisfaction_Score'], 
+    bins=[0, 3, 6, 10], 
+    labels=['Dissatisfied', 'Neutral', 'Satisfied'], 
+    right=True
+)
 
-# Drop unnecessary columns for clarity in EDA
-df = df.drop(['Z_score', 'Feedback_Comments_Encoded'], axis=1)
+# Display the updated dataset
+print("Updated Dataset with Engineered Features:\n", df.head())
 
-# Save or print final preprocessed data
-print(df.head())
+# Summary of the dataset
+print("Dataset Summary:\n", df.describe())
+print("\nUnique values per column:\n", df.nunique())
 
 # Save file
-df.to_csv("Cleaned_Customer_Feedback_Data.csv", index=False)
+df.to_csv("cleaned_customer_feedback_data.csv", index=False)
