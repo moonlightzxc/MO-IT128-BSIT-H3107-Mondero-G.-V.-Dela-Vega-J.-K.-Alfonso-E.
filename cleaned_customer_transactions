@@ -1,0 +1,112 @@
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+
+# Load the dataset
+df = pd.read_csv("/Users/gillianmondero/Downloads/Transaction_Data.csv")
+
+# Check the dataset structure
+print("First few rows of the dataset:")
+print(df.head())
+print("\nDataset information:")
+print(df.info())
+
+# Find and remove duplicate rows
+duplicates = df[df.duplicated()]
+print(f"\nNumber of duplicate rows: {duplicates.shape[0]}")
+
+df_before = df.shape
+df = df.drop_duplicates()
+df_after = df.shape
+
+print(f"\nShape before removing duplicates: {df_before}")
+print(f"Shape after removing duplicates: {df_after}")
+
+# Handle missing values
+missing_values = df.isnull().sum()
+print("\nMissing values in each column before imputation:\n", missing_values)
+
+# Impute missing values
+for column in df.select_dtypes(include=['float64', 'int64']).columns:
+    if column == 'Transaction_Amount':  
+        mean_value = round(df[column].mean(), 2)
+        df[column] = df[column].fillna(mean_value)
+    else:
+        df[column] = df[column].fillna(df[column].mean())
+
+# Ensure no missing values remain
+missing_values_after = df.isnull().sum()
+print("\nMissing values after imputation:\n", missing_values_after)
+assert missing_values_after.sum() == 0, "There are still missing values after imputation."
+
+# Perform one-hot encoding to convert Transaction_Type to numerical
+df = pd.get_dummies(df, columns=['Transaction_Type'], prefix='Type', drop_first=False)
+
+print("\nShape after one-hot encoding:", df.shape)
+
+# Convert Transaction_Date to datetime
+df['Transaction_Date'] = pd.to_datetime(df['Transaction_Date'])
+
+# Calculate skewness for Transaction_Amount
+skewness_transaction_amount = df['Transaction_Amount'].skew()
+print(f"\nSkewness of Transaction_Amount: {skewness_transaction_amount:.5f}")
+
+# Calculate IQR for Transaction_Amount
+Q1 = df['Transaction_Amount'].quantile(0.25)
+Q3 = df['Transaction_Amount'].quantile(0.75)
+IQR = Q3 - Q1
+
+# Define outlier bounds for Transaction_Amount
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+print(f"IQR-based bounds for outliers: Lower Bound = {lower_bound}, Upper Bound = {upper_bound}")
+
+# Calculate the median of Transaction_Amount
+median_value = df['Transaction_Amount'].median()
+print(f"Median value for Transaction_Amount: {median_value}")
+
+# Impute outliers and specific value (10) with the median
+df['Transaction_Amount'] = df['Transaction_Amount'].apply(
+    lambda x: median_value if x < lower_bound or x > upper_bound or x == 10 else x
+)
+
+# Confirm the outliers have been handled
+remaining_outliers = df[(df['Transaction_Amount'] < lower_bound) | (df['Transaction_Amount'] > upper_bound)]
+if remaining_outliers.empty:
+    print("All outliers have been successfully handled.")
+else:
+    print(f"There are still {remaining_outliers.shape[0]} outliers remaining:")
+    print(remaining_outliers)
+
+# Display the first few rows of the updated DataFrame
+print("\nFirst few rows of the updated DataFrame:")
+print(df.head())
+
+# Aggregate features by Customer_ID
+customer_features = df.groupby('Customer_ID').agg(
+    Transactions_Per_Customer=('Customer_ID', 'size'),
+    Average_Transaction_Amount=('Transaction_Amount', 'mean'),
+    Total_Transaction_Amount=('Transaction_Amount', 'sum'),
+    Recency=('Transaction_Date', lambda x: (df['Transaction_Date'].max() - x.max()).days),
+    **{f'Count_{col}': (col, 'sum') for col in df.columns if col.startswith('Type_')}
+).reset_index()
+
+customer_features['Average_Transaction_Amount'] = customer_features['Average_Transaction_Amount'].round(2)
+customer_features['Total_Transaction_Amount'] = customer_features['Total_Transaction_Amount'].round(2)
+
+# Normalize numerical features
+scaler = MinMaxScaler()
+numerical_columns = [
+    'Transactions_Per_Customer', 
+    'Average_Transaction_Amount', 
+    'Total_Transaction_Amount', 
+    'Recency'
+]
+
+customer_features_normalized = customer_features.copy()
+customer_features_normalized[numerical_columns] = scaler.fit_transform(customer_features[numerical_columns])
+
+print("\nFirst few rows of normalized customer features:")
+print(customer_features_normalized.head())
+
+# Save the dataset to a CSV file
+customer_features_normalized.to_csv("cleaned_customer_transactions.csv", index=False)
